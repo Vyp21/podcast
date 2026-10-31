@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="cs" class="dark">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Asistent manuálního střihu podcastu (v5.1)</title>
+ <script src="https://cdn.tailwindcss.com"></script>
+ <script>
+ tailwind.config = { darkMode: 'class', theme: { extend: { colors: { studio: { bg: '#0F172A', panel: '#1E293B', border: '#334155', cut: '#F59E0B', jingle: '#10B981', note: '#8B5CF6', accent: '#06B6D4', speech: '#3B82F6' } } } } }
+ </script>
+ <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+ <style>
+ body { font-family: 'Inter', sans-serif; background: #0F172A; color: #F8FAFC; }
+ ::-webkit-scrollbar { width: 8px; height: 8px; }
+ ::-webkit-scrollbar-track { background: #1E293B; }
+ ::-webkit-scrollbar-thumb { background: #475569; border-radius: 4px; }
+ ::-webkit-scrollbar-thumb:hover { background: #64748B; }
+ .highlight-active-row { background-color: rgba(6, 182, 212, 0.15) !important; border-left: 4px solid #06B6D4; }
+ </style>
+</head>
+<body class="min-h-screen flex flex-col justify-between">
+ <div id="toast" class="fixed bottom-5 right-5 z-50 transform translate-y-20 opacity-0 transition-all duration-300 bg-studio-accent text-slate-950 font-semibold px-4 py-3 rounded-lg shadow-xl flex items-center gap-2 pointer-events-none">
+ <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+ <span id="toast-message">Zpráva...</span>
+ </div>
+
+ <div class="max-w-7xl mx-auto w-full p-4 md:p-6 space-y-6 flex-grow">
+ <header class="bg-studio-panel border border-studio-border rounded-xl p-5 shadow-xl">
+ <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-4 pb-4 border-b border-studio-border">
+ <div class="flex items-center gap-3">
+ <div class="p-3 bg-studio-accent/10 border border-studio-accent/30 rounded-xl text-studio-accent">
+ <svg class="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"></path></svg>
+ </div>
+ <div>
+ <div class="flex items-center gap-2.5">
+ <h1 class="text-2xl font-bold tracking-tight text-white">Asistent manuálního střihu podcastu</h1>
+ <span class="bg-studio-accent/20 text-studio-accent border border-studio-accent/40 font-bold px-2.5 py-0.5 rounded-full text-xs shadow-sm">v5.1</span>
+ </div>
+ <p class="text-xs text-slate-400">Manuální střih, lokální AI přepis mluveného slova a podklad pro zvukaře / REAPER</p>
+ </div>
+ </div>
+
+ <div class="flex flex-wrap items-center gap-2">
+ <button onclick="toggleShortcutsModal()" class="px-3 py-1.5 text-xs font-medium text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition flex items-center gap-1.5">
+ <svg class="w-4 h-4 text-studio-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg> Klávesové zkratky
+ </button>
+ <button onclick="saveProjectJSON()" class="px-3 py-1.5 text-xs font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition flex items-center gap-1.5" title="Uložit projekt do .json">
+ <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg> Uložit JSON
+ </button>
+ <label class="px-3 py-1.5 text-xs font-medium text-slate-200 hover:text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition flex items-center gap-1.5 cursor-pointer" title="Načíst projekt z .json">
+ <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"></path></svg> Načíst JSON
+ <input type="file" id="json-file-input" accept=".json" class="hidden" onchange="loadProjectJSON(event)">
+ </label>
+ <button onclick="resetProjectData()" class="px-3 py-1.5 text-xs font-medium text-rose-400 hover:text-rose-300 bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 rounded-lg transition flex items-center gap-1.5">
+ <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg> Nové zadání
+ </button>
+ </div>
+ </div>
+
+ <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+ <div>
+ <label class="block text-xs font-semibold text-slate-400 mb-1">Název epizody / projektu</label>
+ <input type="text" id="meta-title" placeholder="Např. EP#42 - Rozhovor s hostem" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-studio-accent focus:outline-none" oninput="saveMetadata()">
+ </div>
+ <div>
+ <label class="block text-xs font-semibold text-slate-400 mb-1">Autor / Střihač</label>
+ <input type="text" id="meta-author" placeholder="Jméno střihače" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-studio-accent focus:outline-none" oninput="saveMetadata()">
+ </div>
+ <div>
+ <label class="block text-xs font-semibold text-slate-400 mb-1">Celková poznámka k epizodě</label>
+ <input type="text" id="meta-notes" placeholder="Např. Masterovat na -16 LUFS, vyčistit šum" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-studio-accent focus:outline-none" oninput="saveMetadata()">
+ </div>
+ </div>
+ </header>
+
+ <section class="bg-studio-panel border border-studio-border rounded-xl p-5 shadow-xl space-y-4">
+ <div id="upload-zone" class="border-2 border-dashed border-slate-700 hover:border-studio-accent rounded-xl p-8 text-center bg-slate-900/50 hover:bg-slate-900/80 transition cursor-pointer relative" onclick="document.getElementById('audio-file-input').click()">
+ <input type="file" id="audio-file-input" accept="audio/*" class="hidden" onchange="handleFileSelect(event)">
+ <div class="flex flex-col items-center justify-center gap-2">
+ <div class="p-4 bg-slate-800 rounded-full text-studio-accent">
+ <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+ </div>
+ <p class="font-semibold text-white">Klikněte nebo přetáhněte audio soubor sem</p>
+ <p class="text-xs text-slate-400">Podporuje MP3, WAV, M4A, OGG (lokální zpracování)</p>
+ </div>
+ </div>
+
+ <div id="player-container" class="hidden space-y-4">
+ <div class="flex justify-between items-center text-xs text-slate-400 px-1">
+ <span id="audio-file-name" class="font-medium text-slate-200 truncate max-w-md">Soubor...</span>
+ <span id="audio-status" class="text-studio-accent font-semibold">Načteno</span>
+ </div>
+
+ <div class="relative bg-slate-950 border border-slate-800 rounded-lg p-2 overflow-hidden select-none">
+ <canvas id="waveform-canvas" class="w-full h-28 cursor-pointer block"></canvas>
+ <div id="canvas-loading" class="absolute inset-0 bg-slate-950/80 flex items-center justify-center text-xs text-studio-accent font-medium hidden">Dekódování zvukové vlny...</div>
+ </div>
+
+ <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/80 border border-slate-800 rounded-lg p-3">
+ <div class="flex items-center gap-2">
+ <button onclick="seekRelative(-3)" class="p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition text-xs font-semibold" title="Zpět 3s">-3s</button>
+ <button id="btn-play" onclick="togglePlay()" class="p-3 bg-studio-accent hover:bg-cyan-400 text-slate-950 rounded-lg font-bold transition flex items-center justify-center">
+ <svg id="icon-play" class="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+ <svg id="icon-pause" class="w-6 h-6 hidden" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+ </button>
+ <button onclick="seekRelative(3)" class="p-2 text-slate-300 hover:text-white bg-slate-800 hover:bg-slate-700 rounded-lg transition text-xs font-semibold" title="Vpřed 3s">+3s</button>
+ </div>
+
+ <div class="font-mono text-lg font-semibold tracking-wider text-white">
+ <span id="time-current" class="text-studio-accent">00:00:00</span> / <span id="time-total" class="text-slate-400">00:00:00</span>
+ </div>
+
+ <div class="flex items-center gap-1.5 text-xs text-slate-400">
+ <span>Rychlost:</span>
+ <select id="speed-select" onchange="changeSpeed(this.value)" class="bg-slate-800 text-slate-200 border border-slate-700 rounded px-2 py-1 focus:outline-none focus:border-studio-accent">
+ <option value="0.5">0.5x</option><option value="0.75">0.75x</option><option value="1.0" selected>1.0x</option><option value="1.25">1.25x</option><option value="1.5">1.5x</option><option value="2.0">2.0x</option>
+ </select>
+ </div>
+ </div>
+ </div>
+ <audio id="audio-player"></audio>
+ </section>
+
+ <section class="bg-studio-panel border border-studio-border rounded-xl p-5 shadow-xl space-y-4">
+ <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider flex items-center gap-2">
+ <svg class="w-4 h-4 text-studio-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v3m0 0v3m0-3h3m-3 0H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Manuální vložení značky
+ </h2>
+
+ <div id="cut-pending-banner" class="hidden bg-amber-500/10 border border-amber-500/40 rounded-lg p-3 flex items-center justify-between">
+ <div class="flex items-center gap-2 text-amber-400 text-xs font-semibold">
+ <span class="animate-pulse inline-block w-2.5 h-2.5 rounded-full bg-amber-500"></span> Začátek střihu označen v: <span id="pending-in-time" class="font-mono text-sm underline">00:00:00</span>
+ </div>
+ <div class="flex items-center gap-2">
+ <button onclick="confirmCut()" class="px-3 py-1 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs rounded transition">Označit Konec a Vložit Střih [C]</button>
+ <button onclick="cancelPendingCut()" class="px-2 py-1 text-slate-400 hover:text-slate-200 text-xs">Zrušit</button>
+ </div>
+ </div>
+
+ <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+ <button onclick="handleCutButtonClick()" class="p-3 bg-amber-950/30 hover:bg-amber-900/50 border border-amber-600/40 rounded-xl transition text-left group">
+ <div class="flex justify-between items-center mb-1">
+ <span class="font-bold text-amber-400 group-hover:text-amber-300 flex items-center gap-2 text-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 0L4 4m5 5l-5 5"></path></svg> Střih / Highlight</span>
+ <span class="text-[10px] bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded font-mono">Klávesa C</span>
+ </div>
+ <p class="text-xs text-slate-400">Označí začátek (In) a konec (Out) střihu nebo highlightu.</p>
+ </button>
+
+ <button onclick="openJingleModal()" class="p-3 bg-emerald-950/30 hover:bg-emerald-900/50 border border-emerald-600/40 rounded-xl transition text-left group">
+ <div class="flex justify-between items-center mb-1">
+ <span class="font-bold text-emerald-400 group-hover:text-emerald-300 flex items-center gap-2 text-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 3 .895 3 2zM9 10l12-2"></path></svg> Vlož soubor</span>
+ <span class="text-[10px] bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded font-mono">Klávesa Y</span>
+ </div>
+ <p class="text-xs text-slate-400">Intro/Outro znělka, přechodový efekt, reklamní blok.</p>
+ </button>
+
+ <button onclick="openNoteModal()" class="p-3 bg-purple-950/30 hover:bg-purple-900/50 border border-purple-600/40 rounded-xl transition text-left group">
+ <div class="flex justify-between items-center mb-1">
+ <span class="font-bold text-purple-400 group-hover:text-purple-300 flex items-center gap-2 text-sm"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 v8a2 2 0 01-2 2h-3l-4 4z"></path></svg> Poznámka</span>
+ <span class="text-[10px] bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded font-mono">Klávesa M</span>
+ </div>
+ <p class="text-xs text-slate-400">Instrukce zvukaři (šum, hlasitost, odkašlání).</p>
+ </button>
+ </div>
+ </section>
+
+ <section class="bg-slate-900/90 border border-studio-accent/30 rounded-xl p-5 shadow-xl space-y-4">
+ <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+ <div class="flex items-center gap-3">
+ <div class="p-2.5 bg-studio-accent/20 text-studio-accent rounded-lg">
+ <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+ </div>
+ <div>
+ <h2 class="text-base font-bold text-white flex items-center gap-2">Integrovaný AI přepis mluveného slova</h2>
+ <p class="text-xs text-slate-400">Spusťte přepis přímo v prohlížeči. Vybraná slova se spárují s vašimi střihy.</p>
+ </div>
+ </div>
+
+ <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+ <select id="ai-model-select" onchange="updateAiEstimate()" class="bg-slate-800 text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-studio-accent">
+ <option value="Xenova/whisper-tiny">Whisper Tiny (~39 MB)</option>
+ <option value="Xenova/whisper-base">Whisper Base (~73 MB)</option>
+ <option value="Xenova/whisper-small" selected>Whisper Small (~240 MB)</option>
+ </select>
+
+ <select id="ai-device-select" onchange="updateAiEstimate()" class="bg-slate-800 text-slate-200 border border-studio-accent/50 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:border-studio-accent font-semibold text-cyan-300">
+ <option value="auto" selected>⚡ Bleskový (WebGPU)</option>
+ <option value="wasm">⚖️ Standardní (CPU)</option>
+ </select>
+
+ <button id="btn-start-ai" onclick="runAiTranscription()" class="px-3.5 py-1.5 bg-studio-accent hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition flex items-center gap-1.5 shadow">
+ <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg> Spustit AI přepis
+ </button>
+ </div>
+ </div>
+
+ <div id="ai-estimate-box" class="bg-slate-950/60 border border-slate-800 rounded-lg px-3.5 py-2.5 flex flex-wrap items-center justify-between text-xs gap-2">
+ <div class="flex items-center gap-2 text-slate-300">
+ <svg class="w-4 h-4 text-studio-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+ <span>Odhadovaná doba generování: <strong id="est-duration-text" class="text-amber-400 font-semibold">Vyžaduje načtené audio</strong></span>
+ </div>
+ <div id="est-finish-text" class="font-bold text-emerald-400 font-mono text-xs">Hotovo: —</div>
+ </div>
+
+ <div class="pt-2 border-t border-slate-800/80">
+ <label class="block text-xs font-semibold text-slate-400 mb-1">Vlastní slovník / Nápověda pro AI (Initial Prompt - volitelné)</label>
+ <input type="text" id="ai-prompt-input" placeholder="" class="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none focus:border-studio-accent">
+ <p class="text-[11px] text-slate-500 mt-1">Zadejte neobvyklá jména, slang nebo speciální pojmy.</p>
+ </div>
+
+ <div id="ai-progress-container" class="hidden space-y-2 pt-2 border-t border-slate-800">
+ <div class="flex justify-between items-center text-xs">
+ <div class="flex items-center gap-2.5">
+ <span class="relative flex h-2.5 w-2.5">
+ <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-studio-accent opacity-75"></span>
+ <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-studio-accent"></span>
+ </span>
+ <span id="ai-status-text" class="text-slate-300 font-medium">Příprava výpočtu na pozadí...</span>
+ </div>
+ <div class="flex items-center gap-3">
+ <span class="text-slate-400 font-mono flex items-center gap-1.5 bg-slate-950/50 px-2 py-0.5 rounded border border-slate-800" title="Uplynulý čas výpočtu">
+ <svg class="w-3.5 h-3.5 text-studio-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+ <span id="ai-timer" class="text-slate-200">00:00</span>
+ </span>
+ <span id="ai-status-percent" class="text-studio-accent font-mono font-bold">0%</span>
+ </div>
+ </div>
+ <div class="w-full bg-slate-800 h-2 rounded-full overflow-hidden">
+ <div id="ai-progress-bar" class="bg-studio-accent h-full w-0 transition-all duration-200"></div>
+ </div>
+ </div>
+ </section>
+
+ <section class="bg-studio-panel border border-studio-border rounded-xl p-5 shadow-xl space-y-4">
+ <div class="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
+ <h2 class="text-base font-bold text-white flex items-center gap-2">
+ <svg class="w-5 h-5 text-studio-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg> Střihový protokol pro zvukaře (<span id="items-count">0</span>)
+ </h2>
+
+ <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+ <div class="relative flex-grow lg:flex-grow-0">
+ <input type="text" id="search-input" oninput="handleSearch(this.value)" placeholder="Hledat..." class="w-full lg:w-64 bg-slate-900 border border-slate-700 rounded-lg pl-8 pr-3 py-1.5 text-xs text-white focus:outline-none focus:border-studio-accent">
+ <svg class="w-4 h-4 text-slate-500 absolute left-2.5 top-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+ </div>
+
+ <div class="flex items-center gap-1 bg-slate-900 p-1 rounded-lg border border-slate-800 text-xs">
+ <button onclick="setFilter('all')" id="filter-all" class="px-2.5 py-1 rounded-md font-medium transition bg-slate-800 text-white">Vše</button>
+ <button onclick="setFilter('cut')" id="filter-cut" class="px-2.5 py-1 rounded-md font-medium transition text-slate-400 hover:text-white">Střihy</button>
+ <button onclick="setFilter('jingle')" id="filter-jingle" class="px-2.5 py-1 rounded-md font-medium transition text-slate-400 hover:text-white">Znělky</button>
+ <button onclick="setFilter('note')" id="filter-note" class="px-2.5 py-1 rounded-md font-medium transition text-slate-400 hover:text-white">Poznámky</button>
+ </div>
+ </div>
+ </div>
+
+ <div class="overflow-x-auto border border-slate-800 rounded-lg">
+ <table class="w-full text-left text-sm text-slate-300">
+ <thead class="bg-slate-900 text-xs uppercase text-slate-400 font-semibold border-b border-slate-800">
+ <tr>
+ <th class="py-3 px-4 w-12 text-center">#</th>
+ <th class="py-3 px-4 w-40">Časový kód</th>
+ <th class="py-3 px-4 w-32">Typ akce</th>
+ <th class="py-3 px-4">Pokyn pro zvukaře & mluvené slovo</th>
+ <th class="py-3 px-4 w-28 text-right">Akce</th>
+ </tr>
+ </thead>
+ <tbody id="protocol-table-body" class="divide-y divide-slate-800/60 bg-slate-900/30"></tbody>
+ </table>
+ <div id="empty-table-msg" class="text-center py-10 text-slate-500 text-xs">Zatím nebyly vloženy žádné střihy ani poznámky.</div>
+ </div>
+
+ <div class="pt-4 border-t border-studio-border flex flex-wrap items-center justify-between gap-3">
+ <div class="text-xs text-slate-400">Exporty pro zvukaře a DAWs</div>
+ <div class="flex flex-wrap items-center gap-2">
+ <button onclick="copyForExcel()" class="px-3 py-2 bg-emerald-950/60 hover:bg-emerald-900 text-emerald-300 border border-emerald-700/50 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Kopírovat pro Excel</button>
+ <button onclick="downloadCSV()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Stáhnout CSV</button>
+ <button onclick="downloadReaperCSV()" class="px-3 py-2 bg-cyan-950/60 hover:bg-cyan-900 text-cyan-300 border border-cyan-700/50 rounded-lg text-xs font-semibold transition flex items-center gap-1.5" title="Stáhnout značky ve formátu REAPER CSV"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg> Stáhnout REAPER CSV</button>
+ <button onclick="copyMarkdown()" class="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 rounded-lg text-xs font-semibold transition flex items-center gap-1.5"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg> Kopírovat jako Markdown</button>
+ </div>
+ </div>
+ </section>
+ </div>
+
+ <footer class="py-4 text-center text-xs text-slate-600 border-t border-slate-800/80 mt-6">Asistent manuálního střihu podcastu v5.1 &bull; Lokální zpracování audia v prohlížeči</footer>
+
+ <!-- MODAL: Insert/Edit Marker -->
+ <div id="modal-item" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+ <div class="bg-studio-panel border border-studio-border rounded-xl max-w-lg w-full p-6 shadow-2xl space-y-4">
+ <h3 id="modal-title" class="text-lg font-bold text-white">Vložit instrukci</h3>
+ <form id="item-form" onsubmit="handleFormSubmit(event)" class="space-y-4">
+ <input type="hidden" id="form-item-id">
+ <input type="hidden" id="form-item-type">
+ <input type="hidden" id="form-category">
+
+ <div class="grid grid-cols-2 gap-3">
+ <div>
+ <label class="block text-xs font-semibold text-slate-400 mb-1">Čas In (Začátek)</label>
+ <input type="text" id="form-time-in" oninput="updateModalSpeechPreview()" placeholder="00:00:00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-studio-accent focus:outline-none" required>
+ </div>
+ <div>
+ <label class="block text-xs font-semibold text-slate-400 mb-1">Čas Out (Konec)</label>
+ <input type="text" id="form-time-out" oninput="updateModalSpeechPreview()" placeholder="00:00:00" class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white font-mono focus:ring-2 focus:ring-studio-accent focus:outline-none">
+ </div>
+ </div>
+
+ <div>
+ <label class="block text-xs font-semibold text-slate-400 mb-1.5">Kategorie / Podtyp</label>
+ <div id="category-buttons-container" class="flex flex-wrap gap-1.5"></div>
+ </div>
+
+ <div>
+ <label class="block text-xs font-semibold text-slate-400 mb-1">Rychlé šablony pokynu</label>
+ <div class="flex flex-wrap gap-1.5 mb-1">
+ <button type="button" onclick="setPresetInstruction('Vymazat přeřeknutí a ticho')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 rounded border border-slate-700">Vymazat přeřek</button>
+ <button type="button" onclick="setPresetInstruction('Zkrátit pauzu / mezeru mezi řečníky')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 rounded border border-slate-700">Zkrátit pauzu</button>
+ <button type="button" onclick="setPresetInstruction('jingle_short')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 rounded border border-slate-700">jingle_short</button>
+ <button type="button" onclick="setPresetInstruction('Vyrovnat hlasitost / odstranit šum')" class="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-[11px] text-slate-300 rounded border border-slate-700">Šum / Hlasitost</button>
+ </div>
+ </div>
+
+ <div id="modal-speech-preview"></div>
+
+ <div>
+ <label class="block text-xs font-semibold text-slate-400 mb-1">Detailní instrukce pro zvukaře <span class="text-[10px] text-slate-500 font-normal">(Enter = Uložit, Shift+Enter = Nový řádek)</span></label>
+ <textarea id="form-instruction" rows="2" placeholder="Např. Vymazat přeřeknutí, znělka, zjemnit přechod..." class="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-sm text-white focus:ring-2 focus:ring-studio-accent focus:outline-none"></textarea>
+ </div>
+
+ <div class="flex justify-end gap-2 pt-2">
+ <button type="button" onclick="closeItemModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-semibold rounded-lg transition">Zrušit</button>
+ <button type="submit" class="px-4 py-2 bg-studio-accent hover:bg-cyan-400 text-slate-950 text-sm font-bold rounded-lg transition">Uložit instrukci [Enter]</button>
+ </div>
+ </form>
+ </div>
+ </div>
+
+ <!-- MODAL: Shortcuts Cheatsheet -->
+ <div id="modal-shortcuts" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
+ <div class="bg-studio-panel border border-studio-border rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
+ <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+ <h3 class="text-lg font-bold text-white flex items-center gap-2">
+ <svg class="w-5 h-5 text-studio-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg> Klávesové zkratky (v5.1)
+ </h3>
+ <button onclick="toggleShortcutsModal()" class="text-slate-400 hover:text-white">&times;</button>
+ </div>
+ <div class="space-y-3 text-sm text-slate-300">
+ <div class="flex justify-between items-center py-1 border-b border-slate-800"><span>Play / Pause</span><kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono text-xs text-studio-accent">Mezerník</kbd></div>
+ <div class="flex justify-between items-center py-1 border-b border-slate-800"><span>Posun -3s / +3s</span><kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono text-xs text-studio-accent">Šipka Vlevo / Vpravo</kbd></div>
+ <div class="flex justify-between items-center py-1 border-b border-slate-800"><span>Střih / Highlight (1. In, 2. Out)</span><kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono text-xs text-amber-400">C</kbd></div>
+ <div class="flex justify-between items-center py-1 border-b border-slate-800"><span>Vlož soubor</span><kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono text-xs text-emerald-400">Y</kbd></div>
+ <div class="flex justify-between items-center py-1 border-b border-slate-800"><span>Rychlá poznámka / Oprava</span><kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono text-xs text-purple-400">M</kbd></div>
+ <div class="flex justify-between items-center py-1"><span>Uložit a zavřít modal</span><kbd class="px-2 py-1 bg-slate-800 border border-slate-700 rounded font-mono text-xs text-slate-200">Enter</kbd></div>
+ </div>
+ <div class="pt-2 text-right">
+ <button onclick="toggleShortcutsModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition">Zavřít</button>
+ </div>
+ </div>
+ </div>
+
+ <script>
+ let audioPlayer, audioContext, audioBuffer, rawPcmData, userMarkers = [], transcriptSegments = [], pendingCutIn = null, activeFilter = 'all', searchQuery = '', aiTimerInterval = null, wakeLockObj = null;
+
+ const isFixedItem = m => m.isFixedStart || m.isFixedEnd || m.id?.toString().startsWith('fixed_');
+
+ const createDefaultMarkers = (dur = 0) => [
+ { id: 'fixed_trigger_warning', type: 'note', timeIn: '00:00:00', timeOut: '', timeInSeconds: 0, timeOutSeconds: null, category: 'Trigger warning', instruction: 'Vložit / Zkontrolovat Trigger Warning', isFixedStart: true, orderPriority: 1 },
+ { id: 'fixed_intro', type: 'jingle', timeIn: '00:00:00', timeOut: '', timeInSeconds: 0.001, timeOutSeconds: null, category: 'Úvodní znělka / Intro', instruction: 'Jingle_INTRO.wav', isFixedStart: true, orderPriority: 2 },
+ { id: 'fixed_loop', type: 'jingle', timeIn: '00:00:00', timeOut: '', timeInSeconds: 0.002, timeOutSeconds: null, category: 'Highlighty loop', instruction: 'Jingle_LOOP.wav', isFixedStart: true, orderPriority: 3 },
+ { id: 'fixed_outro', type: 'jingle', timeIn: dur > 0 ? formatFormattedTime(dur) : 'KONEC', timeOut: '', timeInSeconds: dur > 0 ? dur : 999999, timeOutSeconds: null, category: 'Závěrečná znělka / Outro', instruction: 'Jingle_OUTRO.wav', isFixedEnd: true, orderPriority: 999 }
+ ];
+
+ window.addEventListener('load', () => {
+ audioPlayer = document.getElementById('audio-player');
+ setupAudioEventListeners(); setupDropzone(); setupKeyboardShortcuts(); setupModalEnterHandler(); loadStateFromStorage();
+ if (!userMarkers.length) userMarkers = createDefaultMarkers(0);
+ document.getElementById('waveform-canvas')?.addEventListener('click', handleCanvasClick);
+ updateAiEstimate(); renderTable(); drawWaveform();
+ });
+
+ function handleFileSelect(e) {
+ const files = e.target.files || e.dataTransfer?.files;
+ if (files?.[0]) loadAudioFile(files[0]);
+ }
+
+ function setupDropzone() {
+ const dropzone = document.getElementById('upload-zone');
+ if (!dropzone) return;
+ ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(ev => {
+ dropzone.addEventListener(ev, (e) => {
+ e.preventDefault(); e.stopPropagation();
+ const active = ev === 'dragenter' || ev === 'dragover';
+ dropzone.classList.toggle('border-studio-accent', active);
+ dropzone.classList.toggle('bg-slate-800/80', active);
+ if (ev === 'drop') handleFileSelect(e);
+ });
+ });
+ }
+
+ function setupModalEnterHandler() {
+ document.getElementById('item-form').addEventListener('keydown', (e) => {
+ if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleFormSubmit(e); }
+ });
+ }
+
+ function loadAudioFile(file) {
+ document.getElementById('upload-zone').classList.add('hidden');
+ document.getElementById('player-container').classList.remove('hidden');
+ document.getElementById('canvas-loading').classList.remove('hidden');
+ document.getElementById('audio-file-name').innerText = file.name;
+ audioPlayer.src = URL.createObjectURL(file);
+
+ const reader = new FileReader();
+ reader.onload = async (e) => {
+ try {
+ audioContext = audioContext || new (window.AudioContext || window.webkitAudioContext)();
+ audioBuffer = await audioContext.decodeAudioData(e.target.result);
+ extractWaveformPeaks(audioBuffer);
+ document.getElementById('canvas-loading').classList.add('hidden');
+ document.getElementById('time-total').innerText = formatFormattedTime(audioBuffer.duration);
+
+ const outroItem = userMarkers.find(m => m.id === 'fixed_outro' || m.category === 'Závěrečná znělka / Outro');
+ if (outroItem) { outroItem.timeInSeconds = audioBuffer.duration; outroItem.timeIn = formatFormattedTime(audioBuffer.duration); }
+ updateAiEstimate(); saveStateToStorage(); renderTable(); drawWaveform(); showToast('Audio bylo úspěšně načteno.');
+ } catch (err) { document.getElementById('canvas-loading').innerText = 'Chyba při dekódování audia.'; }
+ };
+ reader.readAsArrayBuffer(file);
+ }
+
+ function extractWaveformPeaks(buffer) {
+ const data = buffer.getChannelData(0), count = 800, step = Math.floor(data.length / count);
+ rawPcmData = new Float32Array(count);
+ for (let i = 0; i < count; i++) {
+ let max = 0, start = i * step;
+ for (let j = 0; j < step; j += 10) max = Math.max(max, Math.abs(data[start + j] || 0));
+ rawPcmData[i] = max;
+ }
+ }
+
+ function setupAudioEventListeners() {
+ audioPlayer.addEventListener('timeupdate', () => {
+ document.getElementById('time-current').innerText = formatFormattedTime(audioPlayer.currentTime);
+ drawWaveform(); highlightCurrentTranscriptRow();
+ });
+ const setPlayIcon = paused => {
+ document.getElementById('icon-play').classList.toggle('hidden', !paused);
+ document.getElementById('icon-pause').classList.toggle('hidden', paused);
+ };
+ ['play', 'pause', 'ended'].forEach(ev => audioPlayer.addEventListener(ev, () => setPlayIcon(audioPlayer.paused)));
+ }
+
+ function togglePlay() { if (audioPlayer.src) audioPlayer.paused ? audioPlayer.play() : audioPlayer.pause(); }
+ function pausePlayback() { if (audioPlayer && !audioPlayer.paused) audioPlayer.pause(); }
+ function seekRelative(s) { if (audioPlayer.src) audioPlayer.currentTime = Math.max(0, Math.min(audioPlayer.duration || 0, audioPlayer.currentTime + s)); }
+ function seekToTime(s) {
+ if (!audioPlayer.src) return;
+ if (s > 900000 && audioBuffer) s = audioBuffer.duration;
+ audioPlayer.currentTime = s; audioPlayer.play();
+ }
+ function changeSpeed(v) { if (audioPlayer) audioPlayer.playbackRate = parseFloat(v); }
+
+ function drawWaveform() {
+ const canvas = document.getElementById('waveform-canvas');
+ if (!canvas) return;
+ const ctx = canvas.getContext('2d'), width = canvas.clientWidth, height = canvas.clientHeight;
+ if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+ ctx.clearRect(0, 0, width, height);
+
+ ctx.strokeStyle = '#1E293B'; ctx.lineWidth = 1;
+ for (let x = 0; x < width; x += 60) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke(); }
+
+ const duration = audioBuffer?.duration || audioPlayer?.duration || 0;
+ if (!rawPcmData) {
+ ctx.fillStyle = '#475569'; ctx.font = '12px Inter, sans-serif'; ctx.textAlign = 'center';
+ ctx.fillText('Nahrajte audio soubor pro zobrazení zvukové vlny', width / 2, height / 2);
+ return;
+ }
+
+ if (duration > 0) {
+ userMarkers.forEach(m => {
+ if (m.type === 'cut') {
+ const xIn = (m.timeInSeconds / duration) * width;
+ const xOut = m.timeOutSeconds ? (m.timeOutSeconds / duration) * width : xIn + 4;
+ ctx.fillStyle = 'rgba(245, 158, 11, 0.25)'; ctx.fillRect(xIn, 0, Math.max(2, xOut - xIn), height);
+ ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = 1.5; ctx.setLineDash([4, 2]);
+ ctx.beginPath(); ctx.moveTo(xIn, 0); ctx.lineTo(xIn, height); ctx.moveTo(xOut, 0); ctx.lineTo(xOut, height); ctx.stroke(); ctx.setLineDash([]);
+ }
+ });
+ }
+
+ const barW = width / rawPcmData.length, curX = duration > 0 ? (audioPlayer.currentTime / duration) * width : 0;
+ for (let i = 0; i < rawPcmData.length; i++) {
+ const x = i * barW, barH = Math.max(2, rawPcmData[i] * (height - 10));
+ ctx.fillStyle = x <= curX ? '#06B6D4' : '#475569';
+ ctx.fillRect(x, (height - barH) / 2, barW - 0.5, barH);
+ }
+
+ if (duration > 0) {
+ userMarkers.forEach(m => {
+ if (m.type === 'jingle' || m.type === 'note') {
+ const x = ((m.timeInSeconds > 900000 ? duration : m.timeInSeconds) / duration) * width;
+ const col = m.type === 'jingle' ? '#10B981' : '#8B5CF6';
+ ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+ ctx.fillStyle = col; ctx.beginPath(); ctx.moveTo(x - 4, 0); ctx.lineTo(x + 4, 0); ctx.lineTo(x, 8); ctx.fill();
+ }
+ });
+
+ if (pendingCutIn !== null) {
+ const pX = (pendingCutIn / duration) * width;
+ ctx.strokeStyle = '#F59E0B'; ctx.lineWidth = 2.5; ctx.beginPath(); ctx.moveTo(pX, 0); ctx.lineTo(pX, height); ctx.stroke();
+ ctx.fillStyle = '#F59E0B'; ctx.font = '10px Inter, sans-serif'; ctx.fillText('IN', pX + 3, 12);
+ }
+
+ ctx.strokeStyle = '#FFFFFF'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(curX, 0); ctx.lineTo(curX, height); ctx.stroke();
+ }
+ }
+
+ function handleCanvasClick(e) {
+ const rect = e.currentTarget.getBoundingClientRect(), dur = audioBuffer?.duration || audioPlayer.duration;
+ if (dur > 0) seekToTime(((e.clientX - rect.left) / rect.width) * dur);
+ }
+
+ function updateAiEstimate() {
+ const durEl = document.getElementById('est-duration-text'), finEl = document.getElementById('est-finish-text');
+ if (!durEl || !finEl) return;
+ if (!audioBuffer) { durEl.innerText = 'Vyžaduje načtené audio'; finEl.innerText = 'Hotovo: —'; return; }
+
+ const model = document.getElementById('ai-model-select').value, dev = document.getElementById('ai-device-select').value;
+ let rtf = model.includes('tiny') ? 0.20 : model.includes('base') ? 438 / 1800 : 0.70;
+ if (dev === 'wasm') rtf *= 2.5;
+
+ const totalSec = Math.round(audioBuffer.duration * rtf);
+ const fin = new Date(Date.now() + totalSec * 1000);
+ const m = Math.floor(totalSec / 60), s = totalSec % 60;
+
+ durEl.innerText = m > 0 ? `cca ${m} min ${s} s` : `cca ${s} s`;
+ finEl.innerText = `Hotovo cca v ${String(fin.getHours()).padStart(2, '0')}:${String(fin.getMinutes()).padStart(2, '0')}`;
+ }
+
+ function getMonoPcm(buf) {
+ const len = buf.length, pcm = new Float32Array(len);
+ if (buf.numberOfChannels === 1) pcm.set(buf.getChannelData(0));
+ else {
+ const l = buf.getChannelData(0), r = buf.getChannelData(1);
+ for (let i = 0; i < len; i++) pcm[i] = (l[i] + r[i]) / 2;
+ }
+ return pcm;
+ }
+
+ async function runAiTranscription() {
+ if (!audioBuffer) return showToast('Nejprve prosím nahrajte audio soubor.');
+ pausePlayback(); updateAiEstimate();
+
+ if ('wakeLock' in navigator) { try { wakeLockObj = await navigator.wakeLock.request('screen'); } catch (e) {} }
+
+ const modelName = document.getElementById('ai-model-select').value, deviceChoice = document.getElementById('ai-device-select').value;
+ const customPrompt = (document.getElementById('ai-prompt-input').value || '').trim();
+ const progContainer = document.getElementById('ai-progress-container'), statusText = document.getElementById('ai-status-text');
+ const statusPct = document.getElementById('ai-status-percent'), progBar = document.getElementById('ai-progress-bar');
+ const btnStart = document.getElementById('btn-start-ai'), timerEl = document.getElementById('ai-timer');
+
+ progContainer.classList.remove('hidden'); btnStart.disabled = true; btnStart.classList.add('opacity-50');
+
+ clearInterval(aiTimerInterval);
+ const aiStart = Date.now();
+ timerEl.innerText = '00:00';
+ aiTimerInterval = setInterval(() => {
+ const el = Math.floor((Date.now() - aiStart) / 1000);
+ timerEl.innerText = `${String(Math.floor(el / 60)).padStart(2, '0')}:${String(el % 60).padStart(2, '0')}`;
+ }, 1000);
+
+ const updateProgress = (txt, pct) => { statusText.innerText = txt; statusPct.innerText = `${pct}%`; progBar.style.width = `${pct}%`; };
+ updateProgress('Příprava výpočtu na pozadí...', 5);
+ const monoPcm = getMonoPcm(audioBuffer);
+
+ const workerCode = `
+ import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+ env.allowLocalModels = false; env.useBrowserCache = true;
+ self.onmessage = async (e) => {
+ const { monoPcm, oldSampleRate, modelName, langSelection, customPrompt, deviceChoice } = e.data;
+ try {
+ const targetSampleRate = 16000, newLength = Math.round(monoPcm.length * (targetSampleRate / oldSampleRate));
+ const pcm16k = new Float32Array(newLength), ratio = oldSampleRate / targetSampleRate, chunkSize = 100000;
+ for (let i = 0; i < newLength; i += chunkSize) {
+ const end = Math.min(i + chunkSize, newLength);
+ for (let j = i; j < end; j++) {
+ const orig = j * ratio, idxFloor = Math.floor(orig), idxCeil = Math.min(monoPcm.length - 1, idxFloor + 1);
+ pcm16k[j] = monoPcm[idxFloor] + (orig - idxFloor) * (monoPcm[idxCeil] - monoPcm[idxFloor]);
+ }
+ self.postMessage({ type: 'progress', text: 'Příprava zvukového signálu (16kHz)...', pct: Math.min(85, Math.round((i / newLength) * 85)) });
+ }
+ let dev = 'wasm';
+ if (deviceChoice === 'auto' && navigator.gpu && await navigator.gpu.requestAdapter()) dev = 'webgpu';
+ const devLabel = dev === 'webgpu' ? 'WebGPU' : 'CPU';
+ self.postMessage({ type: 'progress', text: 'Načítání AI modelu (' + devLabel + ')...', pct: 88 });
+ const transcriber = await pipeline('automatic-speech-recognition', modelName, {
+ device: dev,
+ progress_callback: (p) => {
+ if (p.status === 'progress' && p.total) self.postMessage({ type: 'progress', text: 'Stahování AI modelu...', pct: Math.min(92, 85 + Math.round((p.loaded / p.total) * 7)) });
+ }
+ });
+ self.postMessage({ type: 'progress', text: 'Probíhá přepis mluveného slova (' + devLabel + ')...', pct: 95 });
+ const opts = { chunk_length_s: 30, stride_length_s: 5, language: langSelection, task: 'transcribe', return_timestamps: true };
+ if (customPrompt) opts.initial_prompt = customPrompt;
+ const result = await transcriber(pcm16k, opts);
+ self.postMessage({ type: 'complete', result });
+ } catch (err) { self.postMessage({ type: 'error', message: err.message || String(err) }); }
+ };`;
+
+ const worker = new Worker(URL.createObjectURL(new Blob([workerCode], { type: 'application/javascript' })), { type: 'module' });
+ worker.onmessage = (e) => {
+ const { type, text, pct, result, message } = e.data;
+ if (type === 'progress') updateProgress(text, pct);
+ else if (type === 'complete') {
+ transcriptSegments = result?.chunks ? result.chunks.map(c => ({ start: c.timestamp[0] ?? 0, end: c.timestamp[1] ?? 0, text: (c.text || '').trim() })) : [{ start: 0, end: audioBuffer.duration, text: result.text.trim() }];
+ updateProgress('Přepis dokončen!', 100); saveStateToStorage(); renderTable(); showToast('AI přepis byl úspěšně vygenerován!'); cleanupWorker(worker);
+ } else { showToast('Chyba přepisu: ' + message); cleanupWorker(worker); }
+ };
+ worker.onerror = () => { showToast('Chyba ve výpočetním vlákně AI.'); cleanupWorker(worker); };
+ worker.postMessage({ monoPcm, oldSampleRate: audioBuffer.sampleRate, modelName, langSelection: 'czech', customPrompt, deviceChoice }, [monoPcm.buffer]);
+
+ function cleanupWorker(w) {
+ w.terminate(); clearInterval(aiTimerInterval); aiTimerInterval = null;
+ wakeLockObj?.release(); wakeLockObj = null;
+ btnStart.disabled = false; btnStart.classList.remove('opacity-50');
+ setTimeout(() => progContainer.classList.add('hidden'), 3000);
+ }
+ }
+
+ function getSpeechInTimeRange(sIn, sOut) {
+ if (!transcriptSegments.length) return '';
+ const effEnd = (sOut && sOut > sIn) ? sOut : sIn + 3;
+ return transcriptSegments.filter(s => s.start <= effEnd && s.end >= sIn).map(m => m.text).join(' ');
+ }
+
+ function handleCutButtonClick() {
+ pausePlayback();
+ const cur = audioPlayer?.currentTime || 0;
+ if (pendingCutIn === null) {
+ pendingCutIn = cur; updateCutPendingBanner(); showToast(`Začátek střihu označen v ${formatFormattedTime(pendingCutIn)}`); drawWaveform();
+ } else confirmCut();
+ }
+
+ function updateCutPendingBanner() {
+ const banner = document.getElementById('cut-pending-banner');
+ banner.classList.toggle('hidden', pendingCutIn === null);
+ if (pendingCutIn !== null) document.getElementById('pending-in-time').innerText = formatFormattedTime(pendingCutIn);
+ }
+
+ function confirmCut() {
+ pausePlayback();
+ if (pendingCutIn === null) return;
+ const cur = audioPlayer?.currentTime || pendingCutIn + 2;
+ openItemModal('cut', { timeIn: formatFormattedTime(Math.min(pendingCutIn, cur)), timeOut: formatFormattedTime(Math.max(pendingCutIn, cur)), category: 'Střih / Vymazat úsek', instruction: 'Vymazat přeřeknutí a ticho' });
+ }
+
+ function cancelPendingCut() { pendingCutIn = null; updateCutPendingBanner(); drawWaveform(); showToast('Označování střihu zrušeno.'); }
+ function openJingleModal() { pausePlayback(); openItemModal('jingle', { timeIn: formatFormattedTime(audioPlayer?.currentTime || 0), timeOut: '', category: 'Úvodní znělka / Intro', instruction: 'Vložit znělku' }); }
+ function openNoteModal() { pausePlayback(); openItemModal('note', { timeIn: formatFormattedTime(audioPlayer?.currentTime || 0), timeOut: '', category: 'Přeřeknutí / Opakování', instruction: 'Opravit mluvený úsek' }); }
+
+ function openItemModal(type, defaults = {}, isEditId = null) {
+ pausePlayback();
+ document.getElementById('form-item-id').value = isEditId || '';
+ document.getElementById('form-item-type').value = type;
+ document.getElementById('form-time-in').value = defaults.timeIn || '00:00:00';
+ document.getElementById('form-time-out').value = defaults.timeOut || '';
+ document.getElementById('form-instruction').value = defaults.instruction || '';
+
+ const cats = type === 'cut' ? ['Střih / Vymazat úsek', 'Highlight / Zajímavý moment', 'Vymazat pauzu / Ticho', 'Odstranit přeřeknutí', 'Ostatní střih'] :
+ type === 'jingle' ? ['Úvodní znělka / Intro', 'Highlighty loop', 'Závěrečná znělka / Outro', 'jingle_short', 'Pozvánka/Reklama'] :
+ ['Trigger warning', 'Přeřeknutí / Opakování', 'Šum / Ruch / Pleskání', 'Úprava hlasitosti', 'Ostatní instrukce'];
+
+ document.getElementById('modal-title').innerText = `${isEditId ? 'Upravit' : 'Vložit'} ${type === 'cut' ? 'střih' : type === 'jingle' ? 'znělku' : 'poznámku'}`;
+ renderCategoryButtons(cats, defaults.category || cats[0]);
+ updateModalSpeechPreview();
+ document.getElementById('modal-item').classList.remove('hidden');
+ }
+
+ function renderCategoryButtons(categories, selected) {
+ const container = document.getElementById('category-buttons-container');
+ document.getElementById('form-category').value = selected;
+ container.innerHTML = '';
+ const activeClass = 'px-2.5 py-1.5 bg-studio-accent text-slate-950 font-bold text-xs rounded-lg border border-cyan-300 transition shadow';
+ const inactiveClass = 'px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-lg border border-slate-700 transition';
+ categories.forEach(cat => {
+ const btn = document.createElement('button'); btn.type = 'button';
+ btn.className = cat === selected ? activeClass : inactiveClass;
+ btn.innerText = cat;
+ btn.onclick = () => {
+ document.getElementById('form-category').value = cat;
+ Array.from(container.children).forEach(b => b.className = b.innerText === cat ? activeClass : inactiveClass);
+ };
+ container.appendChild(btn);
+ });
+ }
+
+ function closeItemModal() { document.getElementById('modal-item').classList.add('hidden'); }
+ function setPresetInstruction(t) { document.getElementById('form-instruction').value = t; }
+
+ function updateModalSpeechPreview() {
+ const speech = getSpeechInTimeRange(parseFormattedTime(document.getElementById('form-time-in').value), parseFormattedTime(document.getElementById('form-time-out').value));
+ document.getElementById('modal-speech-preview').innerHTML = speech ? `<div class="text-[11px] text-cyan-300/90 bg-cyan-950/40 p-2.5 rounded border border-cyan-800/40 space-y-1"><span class="font-semibold text-cyan-400 block uppercase tracking-wider text-[10px]">Mluvené slovo v tomto úseku (AI):</span><div class="italic">"${escapeHtml(speech)}"</div></div>` : `<div class="text-[11px] text-slate-500 italic">Pro tento úsek není k dispozici přepis.</div>`;
+ }
+
+ function handleFormSubmit(e) {
+ if (e) e.preventDefault();
+ const id = document.getElementById('form-item-id').value || 'item_' + Date.now();
+ const timeInStr = document.getElementById('form-time-in').value, timeOutStr = document.getElementById('form-time-out').value;
+ const item = { id, type: document.getElementById('form-item-type').value, timeIn: timeInStr, timeOut: timeOutStr, timeInSeconds: parseFormattedTime(timeInStr), timeOutSeconds: timeOutStr ? parseFormattedTime(timeOutStr) : null, category: document.getElementById('form-category').value, instruction: document.getElementById('form-instruction').value };
+
+ const idx = userMarkers.findIndex(m => m.id === id);
+ if (idx >= 0) userMarkers[idx] = item; else userMarkers.push(item);
+
+ closeItemModal(); pendingCutIn = null; updateCutPendingBanner(); saveStateToStorage(); renderTable(); drawWaveform(); showToast('Instrukce byla uložena.');
+ }
+
+ function editItem(id) { const item = userMarkers.find(m => m.id === id); if (item) openItemModal(item.type, item, item.id); }
+ function deleteItem(id) { userMarkers = userMarkers.filter(m => m.id !== id); saveStateToStorage(); renderTable(); drawWaveform(); showToast('Položka byla smazána.'); }
+
+ function setFilter(f) {
+ activeFilter = f;
+ ['all', 'cut', 'jingle', 'note'].forEach(filter => {
+ const btn = document.getElementById(`filter-${filter}`);
+ if (btn) btn.className = filter === f ? 'px-2.5 py-1 rounded-md font-medium transition bg-slate-800 text-white' : 'px-2.5 py-1 rounded-md font-medium transition text-slate-400 hover:text-white';
+ });
+ renderTable();
+ }
+
+ function handleSearch(v) { searchQuery = (v || '').toLowerCase(); renderTable(); }
+
+ function renderTable() {
+ const tbody = document.getElementById('protocol-table-body'), emptyMsg = document.getElementById('empty-table-msg');
+ tbody.innerHTML = '';
+
+ let filtered = userMarkers.filter(item => {
+ if (activeFilter !== 'all' && item.type !== activeFilter) return false;
+ if (!searchQuery) return true;
+ const speech = getSpeechInTimeRange(item.timeInSeconds, item.timeOutSeconds).toLowerCase();
+ return item.instruction?.toLowerCase().includes(searchQuery) || item.category?.toLowerCase().includes(searchQuery) || speech.includes(searchQuery);
+ });
+
+ filtered.sort((a, b) => (a.orderPriority || 500) - (b.orderPriority || 500) || (a.timeInSeconds || 0) - (b.timeInSeconds || 0));
+ document.getElementById('items-count').innerText = filtered.length;
+
+ emptyMsg.classList.toggle('hidden', filtered.length > 0);
+
+ filtered.forEach((item, idx) => {
+ const tr = document.createElement('tr');
+ tr.dataset.time = item.timeInSeconds; tr.className = 'hover:bg-slate-800/50 transition group cursor-pointer protocol-row';
+ tr.onclick = (e) => { if (!e.target.closest('button')) seekToTime(item.timeInSeconds); };
+
+ const badge = item.type === 'cut' ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-amber-500/20 text-amber-400 border border-amber-500/30"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 0L4 4m5 5l-5 5"></path></svg> Střih</span>' :
+ item.type === 'jingle' ? '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-2v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12 0c0 1.105-1.343 2-3 2s-3-.895-3-2 3 .895 3 2zM9 10l12-2"></path></svg> Znělka</span>' :
+ '<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold bg-purple-500/20 text-purple-400 border border-purple-500/30"><svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 v8a2 2 0 01-2 2h-3l-4 4z"></path></svg> Poznámka</span>';
+
+ const speech = isFixedItem(item) ? '' : getSpeechInTimeRange(item.timeInSeconds, item.timeOutSeconds);
+ const timeDisplay = item.timeOut ? `${item.timeIn} – ${item.timeOut}` : item.timeIn;
+
+ tr.innerHTML = `
+ <td class="py-3 px-4 text-center text-xs font-mono text-slate-500">${idx + 1}</td>
+ <td class="py-3 px-4 font-mono font-semibold text-studio-accent text-xs">
+ <button onclick="seekToTime(${item.timeInSeconds})" class="hover:underline flex items-center gap-1" title="Přehrát"><svg class="w-3.5 h-3.5 text-slate-400 group-hover:text-studio-accent" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>${timeDisplay}</button>
+ </td>
+ <td class="py-3 px-4">${badge}</td>
+ <td class="py-3 px-4">
+ <div class="font-semibold text-slate-200 text-xs">${item.category}</div>
+ <div class="text-slate-300 text-xs mt-0.5 leading-relaxed font-medium font-mono">${escapeHtml(item.instruction || 'Bez pokynu')}</div>
+ ${speech ? `<div class="mt-1.5 text-[11px] text-cyan-300/80 italic bg-slate-900/60 p-2 rounded border border-slate-800/80 flex items-start gap-1"><span class="font-semibold not-italic text-slate-500 flex-shrink-0">Slova:</span> "${escapeHtml(speech)}"</div>` : ''}
+ </td>
+ <td class="py-3 px-4 text-right">
+ <div class="flex items-center justify-end gap-1">
+ <button onclick="editItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded transition" title="Upravit"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg></button>
+ <button onclick="deleteItem('${item.id}')" class="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-slate-800 rounded transition" title="Smazat"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>
+ </div>
+ </td>`;
+ tbody.appendChild(tr);
+ });
+ highlightCurrentTranscriptRow();
+ }
+
+ function highlightCurrentTranscriptRow() {
+ if (!audioPlayer) return;
+ const curTime = audioPlayer.currentTime || 0;
+ document.querySelectorAll('.protocol-row').forEach(row => {
+ row.classList.toggle('highlight-active-row', Math.abs(curTime - parseFloat(row.dataset.time || 0)) < 1.5);
+ });
+ }
+
+ function getProjectHeaderMeta() {
+ return {
+ title: document.getElementById('meta-title').value || 'Bez názvu',
+ author: document.getElementById('meta-author').value || 'Neuveden',
+ notes: document.getElementById('meta-notes').value || 'Bez poznámky'
+ };
+ }
+
+ function saveMetadata() { saveStateToStorage(); }
+
+ function copyForExcel() {
+ const meta = getProjectHeaderMeta();
+ let tsv = `STŘIHOVÝ PROTOKOL PODCASTU (v5.1)\nNázev epizody:\t${meta.title}\nAutor/Střihač:\t${meta.author}\nPoznámka:\t${meta.notes}\n\n#\tČasový kód\tTyp\tKategorie\tPokyn zvukařovi\tMluvené slovo v úseku (AI)\n`;
+ userMarkers.forEach((item, idx) => {
+ const speech = isFixedItem(item) ? '' : getSpeechInTimeRange(item.timeInSeconds, item.timeOutSeconds);
+ tsv += `${idx + 1}\t${item.timeOut ? `${item.timeIn} – ${item.timeOut}` : item.timeIn}\t${item.type.toUpperCase()}\t${item.category}\t${(item.instruction || '').replace(/\n/g, ' ')}\t${speech.replace(/\n/g, ' ')}\n`;
+ });
+ copyToClipboard(tsv, 'Tabulka zkopírována do schránky (vložte Ctrl+V do Excelu).');
+ }
+
+ function downloadCSV() {
+ const meta = getProjectHeaderMeta();
+ let csv = '\uFEFF"STŘIHOVÝ PROTOKOL PODCASTU (v5.1)"\n' + `"Název epizody:","${meta.title.replace(/"/g, '""')}"\n` + `"Autor/Střihač:","${meta.author.replace(/"/g, '""')}"\n` + `"Poznámka:","${meta.notes.replace(/"/g, '""')}"\n\n` + `"Číslo","Časový kód","Typ","Kategorie","Pokyn zvukařovi","Mluvená slova v úseku"\n`;
+ userMarkers.forEach((item, idx) => {
+ const speech = isFixedItem(item) ? '' : getSpeechInTimeRange(item.timeInSeconds, item.timeOutSeconds);
+ csv += `"${idx + 1}","${item.timeOut ? `${item.timeIn} – ${item.timeOut}` : item.timeIn}","${item.type.toUpperCase()}","${item.category.replace(/"/g, '""')}","${(item.instruction || '').replace(/"/g, '""')}","${speech.replace(/"/g, '""')}"\n`;
+ });
+ const link = document.createElement('a');
+ link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+ link.download = `Protocol_${meta.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`;
+ link.click(); showToast('Soubor CSV stažen.');
+ }
+
+ function downloadReaperCSV() {
+ const meta = getProjectHeaderMeta();
+ let csv = '#,Name,Start,End\r\n';
+ const sortedMarkers = [...userMarkers].sort((a, b) => (a.orderPriority || 500) - (b.orderPriority || 500) || (a.timeInSeconds || 0) - (b.timeInSeconds || 0));
+ let markerIndex = 1, regionIndex = 1;
+
+ sortedMarkers.forEach((item, idx) => {
+ const isRegion = item.type === 'cut' || (item.category && item.category.toLowerCase().includes('highlight'));
+ const mNum = (item.isFixedEnd || item.id === 'fixed_outro') ? 'M999' : isRegion ? `R${regionIndex++}` : `M${markerIndex++}`;
+ let name = (idx === 0 && (item.isFixedStart || item.id === 'fixed_trigger_warning' || item.id === 'fixed_intro')) ? '=START' : (item.isFixedEnd || item.id === 'fixed_outro') ? '=END' : `[${item.type === 'cut' ? 'STŘIH' : item.type === 'jingle' ? 'ZNĚLKA' : 'POZNÁMKA'}] ${item.instruction ? `${item.category} - ${item.instruction}` : item.category}`.trim();
+
+ if (name.includes(',') || name.includes('"')) name = `"${name.replace(/"/g, '""')}"`;
+ const startTime = formatReaperTime(item.timeInSeconds || 0);
+ const endTime = isRegion ? formatReaperTime(item.timeOutSeconds || item.timeInSeconds || 0) : '';
+
+ csv += `${mNum},${name},${startTime},${endTime}\r\n`;
+ });
+
+ const link = document.createElement('a');
+ link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+ link.download = `Reaper_Markers_${meta.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.csv`;
+ link.click();
+ showToast('REAPER CSV značky a regiony byly úspěšně staženy.');
+ }
+
+ function formatReaperTime(s) {
+ if (isNaN(s) || s < 0) return '00:00:00:00';
+ const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60), frames = Math.floor((s % 1) * 25);
+ return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}:${String(frames).padStart(2, '0')}`;
+ }
+
+ function copyMarkdown() {
+ const meta = getProjectHeaderMeta();
+ let md = `# Střihový protokol (v5.1): ${meta.title}\n**Autor:** ${meta.author} \n**Poznámka:** ${meta.notes}\n\n| # | Časový kód | Typ | Pokyn / Mluvená slova |\n|---|---|---|---|\n`;
+ userMarkers.forEach((item, idx) => {
+ const speech = isFixedItem(item) ? '' : getSpeechInTimeRange(item.timeInSeconds, item.timeOutSeconds);
+ md += `| ${idx + 1} | \`${item.timeOut ? `${item.timeIn} – ${item.timeOut}` : item.timeIn}\` | **${item.category}** | ${item.instruction || ''}${speech ? ` *(Slova: "${speech}")*` : ''} |\n`;
+ });
+ copyToClipboard(md, 'Markdown zkopírován do schránky.');
+ }
+
+ function saveProjectJSON() {
+ const meta = getProjectHeaderMeta();
+ const link = document.createElement('a');
+ link.href = URL.createObjectURL(new Blob([JSON.stringify({ meta, userMarkers, transcriptSegments, version: '5.1', savedAt: new Date().toISOString() }, null, 2)], { type: 'application/json' }));
+ link.download = `Podcast_Project_${meta.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.json`;
+ link.click(); showToast('Projekt uložen do JSON souboru.');
+ }
+
+ function loadProjectJSON(e) {
+ const file = e.target.files?.[0]; if (!file) return;
+ const reader = new FileReader();
+ reader.onload = (ev) => {
+ try {
+ const data = JSON.parse(ev.target.result);
+ if (data.meta) {
+ document.getElementById('meta-title').value = data.meta.title || '';
+ document.getElementById('meta-author').value = data.meta.author || '';
+ document.getElementById('meta-notes').value = data.meta.notes || '';
+ }
+ if (data.userMarkers) userMarkers = data.userMarkers;
+ if (data.transcriptSegments) transcriptSegments = data.transcriptSegments;
+ saveStateToStorage(); renderTable(); drawWaveform(); showToast('Projekt načten ze souboru JSON.');
+ } catch (err) { showToast('Chyba při čtení JSON souboru.'); }
+ };
+ reader.readAsText(file);
+ }
+
+ function saveStateToStorage() {
+ try { localStorage.setItem('podcast_editor_state_v5', JSON.stringify({ meta: getProjectHeaderMeta(), userMarkers, transcriptSegments })); } catch (e) {}
+ }
+
+ function loadStateFromStorage() {
+ try {
+ const saved = localStorage.getItem('podcast_editor_state_v5') || localStorage.getItem('podcast_editor_state_v4');
+ if (saved) {
+ const parsed = JSON.parse(saved);
+ if (parsed.meta) {
+ document.getElementById('meta-title').value = parsed.meta.title || '';
+ document.getElementById('meta-author').value = parsed.meta.author || '';
+ document.getElementById('meta-notes').value = parsed.meta.notes || '';
+ }
+ if (parsed.userMarkers) userMarkers = parsed.userMarkers;
+ if (parsed.transcriptSegments) transcriptSegments = parsed.transcriptSegments;
+ }
+ } catch (e) {}
+ }
+
+ function resetProjectData() {
+ if (confirm('Opravdu chcete vymazat všechna data střihového protokolu a načíst výchozí šablonu?')) {
+ userMarkers = createDefaultMarkers(audioBuffer?.duration || 0);
+ transcriptSegments = []; pendingCutIn = null;
+ ['meta-title', 'meta-author', 'meta-notes'].forEach(id => document.getElementById(id).value = '');
+ localStorage.removeItem('podcast_editor_state_v5');
+ updateCutPendingBanner(); renderTable(); drawWaveform(); showToast('Projekt byl resetován na výchozí šablonu.');
+ }
+ }
+
+ function copyToClipboard(text, successMsg) {
+ if (navigator.clipboard?.writeText) {
+ navigator.clipboard.writeText(text).then(() => showToast(successMsg)).catch(() => showToast('Chyba při kopírování.'));
+ } else {
+ const ta = document.createElement('textarea'); ta.value = text; ta.style.cssText = 'position:fixed;opacity:0';
+ document.body.appendChild(ta); ta.select();
+ try { document.execCommand('copy'); showToast(successMsg); } catch (e) { showToast('Chyba při kopírování.'); }
+ document.body.removeChild(ta);
+ }
+ }
+
+ function setupKeyboardShortcuts() {
+ window.addEventListener('keydown', (e) => {
+ if (['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+ if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
+ else if (e.code === 'ArrowLeft') { e.preventDefault(); seekRelative(-3); }
+ else if (e.code === 'ArrowRight') { e.preventDefault(); seekRelative(3); }
+ else if (e.code === 'KeyC') { e.preventDefault(); handleCutButtonClick(); }
+ else if (e.code === 'KeyY' || e.key.toLowerCase() === 'y' || e.key.toLowerCase() === 'z') { e.preventDefault(); openJingleModal(); }
+ else if (e.code === 'KeyM') { e.preventDefault(); openNoteModal(); }
+ });
+ }
+
+ function toggleShortcutsModal() { document.getElementById('modal-shortcuts').classList.toggle('hidden'); }
+
+ function formatFormattedTime(s) {
+ if (isNaN(s) || s < 0) return '00:00:00';
+ const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), sec = Math.floor(s % 60), ms = Math.floor((s % 1) * 10);
+ return `${h > 0 ? String(h).padStart(2, '0') + ':' : ''}${String(m).padStart(2, '0')}:${String(sec).padStart(2, '0')}.${ms}`;
+ }
+
+ function parseFormattedTime(str) {
+ if (!str) return 0;
+ const parts = str.trim().split(':');
+ if (parts.length === 3) return parseFloat(parts[0]) * 3600 + parseFloat(parts[1]) * 60 + parseFloat(parts[2]);
+ if (parts.length === 2) return parseFloat(parts[0]) * 60 + parseFloat(parts[1]);
+ return parseFloat(str) || 0;
+ }
+
+ function showToast(msg) {
+ const toast = document.getElementById('toast');
+ document.getElementById('toast-message').innerText = msg;
+ toast.classList.remove('translate-y-20', 'opacity-0');
+ toast.classList.add('translate-y-0', 'opacity-100');
+ setTimeout(() => { toast.classList.remove('translate-y-0', 'opacity-100'); toast.classList.add('translate-y-20', 'opacity-0'); }, 3000);
+ }
+
+ function escapeHtml(str) {
+ return str ? str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;") : '';
+ }
+ </script>
+</body>
+</html>
