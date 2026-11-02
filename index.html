@@ -316,7 +316,7 @@
     </section>
   </div>
 
-  <footer class="py-4 text-center text-xs text-slate-600 border-t border-slate-800/80 mt-6">Asistent manuálního střihu podcastu v5.1 &bull; Lokální zpracování audia v prohlížeči</footer>
+  <footer class="py-4 text-center text-xs text-slate-600 border-t border-slate-800/80 mt-6">Asistent manuálního střihu podcastu v 5.2 &bull; Lokální zpracování audia v prohlížeči</footer>
 
   <!-- MODAL: Insert/Edit Marker -->
   <div id="modal-item" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-50 flex items-center justify-center hidden p-4">
@@ -373,7 +373,7 @@
     <div class="bg-studio-panel border border-studio-border rounded-xl max-w-md w-full p-6 shadow-2xl space-y-4">
       <div class="flex justify-between items-center border-b border-slate-700 pb-3">
         <h3 class="text-lg font-bold text-white flex items-center gap-2">
-          <svg class="w-5 h-5 text-studio-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg> Klávesové zkratky (v5.1)
+          <svg class="w-5 h-5 text-studio-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg> Klávesové zkratky (v 5.2)
         </h3>
         <button onclick="toggleShortcutsModal()" class="text-slate-400 hover:text-white">&times;</button>
       </div>
@@ -877,7 +877,7 @@
 
     function copyForExcel() {
       const meta = getProjectHeaderMeta();
-      let tsv = `STŘIHOVÝ PROTOKOL PODCASTU (v5.1)\nNázev epizody:\t${meta.title}\nAutor/Střihač:\t${meta.author}\nPoznámka:\t${meta.notes}\n\n#\tČasový kód\tTyp\tKategorie\tPokyn zvukařovi\tMluvené slovo v úseku (AI)\n`;
+      let tsv = `STŘIHOVÝ PROTOKOL PODCASTU (v 5.2)\nNázev epizody:\t${meta.title}\nAutor/Střihač:\t${meta.author}\nPoznámka:\t${meta.notes}\n\n#\tČasový kód\tTyp\tKategorie\tPokyn zvukařovi\tMluvené slovo v úseku (AI)\n`;
       userMarkers.forEach((item, idx) => {
         const speech = isFixedItem(item) ? '' : getSpeechInTimeRange(item.timeInSeconds, item.timeOutSeconds);
         tsv += `${idx + 1}\t${item.timeOut ? `${item.timeIn} – ${item.timeOut}` : item.timeIn}\t${(item.type || '').toUpperCase()}\t${item.category || ''}\t${(item.instruction || '').replace(/\r?\n/g, ' ')}\t${speech.replace(/\r?\n/g, ' ')}\n`;
@@ -887,7 +887,7 @@
 
     function downloadCSV() {
       const meta = getProjectHeaderMeta();
-      let csv = `"STŘIHOVÝ PROTOKOL PODCASTU (v5.1)"\n` + 
+      let csv = `"STŘIHOVÝ PROTOKOL PODCASTU ( v5.2)"\n` + 
                 `"Název epizody:","${meta.title.replace(/"/g, '""')}"\n` + 
                 `"Autor/Střihač:","${meta.author.replace(/"/g, '""')}"\n` + 
                 `"Poznámka:","${meta.notes.replace(/"/g, '""')}"\n\n` + 
@@ -942,7 +942,7 @@
 
     function copyMarkdown() {
       const meta = getProjectHeaderMeta();
-      let md = `# Střihový protokol (v5.1): ${meta.title}\n**Autor:** ${meta.author} \n**Poznámka:** ${meta.notes}\n\n| # | Časový kód | Typ | Pokyn / Mluvená slova |\n|---|---|---|---|\n`;
+      let md = `# Střihový protokol (v 5.2): ${meta.title}\n**Autor:** ${meta.author} \n**Poznámka:** ${meta.notes}\n\n| # | Časový kód | Typ | Pokyn / Mluvená slova |\n|---|---|---|---|\n`;
       userMarkers.forEach((item, idx) => {
         const speech = isFixedItem(item) ? '' : getSpeechInTimeRange(item.timeInSeconds, item.timeOutSeconds);
         md += `| ${idx + 1} | \`${item.timeOut ? `${item.timeIn} – ${item.timeOut}` : item.timeIn}\` | **${item.category || ''}** | ${item.instruction || ''}${speech ? ` *(Slova: "${speech}")*` : ''} |\n`;
